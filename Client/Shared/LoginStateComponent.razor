@@ -1,0 +1,17 @@
+﻿@using Blazored.LocalStorage;
+@using ControleVendas.Client.Services;
+@inject NavigationManager NavigationManager
+@inject IAuthService AuthService
+
+<AuthorizeView>
+    <Authorized>
+        <button class="btn btn-danger" @onclick="Logout">Logout</button>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    async Task Logout()
+    {
+        await AuthService.Logout();
+    }
+}

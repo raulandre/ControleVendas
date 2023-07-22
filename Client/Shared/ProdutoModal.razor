@@ -1,0 +1,13 @@
+﻿@*<Modal @ref="produtoModal" />
+
+<Button Color="ButtonColor.Primary" @onclick="ShowEmployeeComponent">Show Employee Component</Button>
+
+@code {
+    private Modal produtoModal = default!;
+
+    private async Task ShowEmployeeComponent()
+    {
+        var parameters = new Dictionary<string, object>();
+        parameters.Add("EmployeeId", 321);
+    }
+}*@

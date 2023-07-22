@@ -1,0 +1,231 @@
+﻿@page "/produtos"
+@using ControleVendas.Shared
+@using ControleVendas.Shared.Models
+@using MatBlazor
+@using System.Text.Json;
+@using System.Text;
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+@if (HasError)
+{
+    <div class="alert alert-danger" role="alert">
+        @ErrorMessage
+    </div>
+}
+
+<PageTitle>Produtos</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <button type="submit" class="btn btn-primary mb-2" @onclick="AbrirModalCriacao">Novo produto</button>
+        <MatTable Context="ctx" Items="@produtos" Class="mat-elevation-z5">
+            <MatTableHeader>
+                <th>Id</th>
+                <th>Descrição</th>
+                <th>Preço</th>
+                <th>Quantidade</th>
+                <th>Ações</th>
+            </MatTableHeader>
+            <MatTableRow>
+                <td>@ctx.Id</td>
+                <td>@ctx.Descricao</td>
+                <td>@ctx.Preco</td>
+                <td>@ctx.Quantidade</td>
+                <td>
+                    <button class=@($"btn {(ctx.Ativo ? "btn-danger" : "btn-success")} mb-2")
+                    @onclick="@(ctx.Ativo ? async () => await Inativar(ctx) : async () => await Ativar(ctx))">
+                        @(ctx.Ativo ? "Inativar" : "Ativar")
+                    </button>
+
+                    <button class="btn btn-primary mb-2" @onclick="() => AbrirModalEdicao((Produto)ctx.Clone())">Editar</button>
+                </td>
+            </MatTableRow>
+        </MatTable>
+    </Authorized>
+    <NotAuthorized>
+        Sem permissão.
+    </NotAuthorized>
+</AuthorizeView>
+
+<MatDialog @bind-IsOpen="modalIsOpen">
+    <EditForm Model="Produto" OnValidSubmit="@(edicao ? EditarProduto : CriarProduto)">
+        <MatDialogTitle>@(edicao ? "Editar" : "Criar") produto</MatDialogTitle>
+        <MatDialogContent>
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group">
+                <label for="descricao">Descrição</label>
+                <InputText Id="descricao" class="form-control" @bind-Value="Produto.Descricao" />
+                <ValidationMessage For="@(() => Produto.Descricao)" />
+            </div>
+            <div class="form-group">
+                <label for="preco">Preço</label>
+                <InputNumber Id="preco" class="form-control" @bind-Value="Produto.Preco" />
+                <ValidationMessage For="@(() => Produto.Descricao)" />
+            </div>
+            <div class="form-group">
+                <label for="quantidade">Quantidade</label>
+                <InputNumber Id="quantidade" class="form-control" @bind-Value="Produto.Quantidade" />
+                <ValidationMessage For="@(() => Produto.Quantidade)" />
+            </div>
+        </MatDialogContent>
+        <MatDialogActions>
+            <MatButton OnClick="() => modalIsOpen = false">Cancelar</MatButton>
+            <MatButton type="submit">Salvar</MatButton>
+        </MatDialogActions>
+    </EditForm>
+</MatDialog>
+
+@code {
+    public List<Produto> produtos = new();
+
+    public bool HasError { get; set; }
+    public string ErrorMessage { get; set; }
+
+    public Produto Produto { get; set; } = new();
+    private bool edicao = false;
+    private bool modalIsOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarGrid();
+    }
+
+    public async Task CarregarGrid()
+    {
+        try
+        {
+            HasError = false;
+            var response = await Http.GetAsync("Produto");
+
+            if (response.IsSuccessStatusCode)
+            {
+                produtos = JsonSerializer.Deserialize<List<Produto>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    public void AbrirModalCriacao()
+    {
+        Produto = new();
+        edicao = false;
+        modalIsOpen = true;
+        StateHasChanged();
+    }
+
+    public void AbrirModalEdicao(Produto produto)
+    {
+        Produto = produto;
+        edicao = true;
+        modalIsOpen = true;
+        StateHasChanged();
+    }
+
+    public async Task Inativar(Produto produto)
+    {
+        try
+        {
+            HasError = false;
+            var produtoAsJson = JsonSerializer.Serialize(produto);
+            var response = await Http.PostAsync("Produto/inativar", new StringContent(produtoAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    public async Task Ativar(Produto produto)
+    {
+        try
+        {
+            HasError = false;
+            var produtoAsJson = JsonSerializer.Serialize(produto);
+            var response = await Http.PostAsync("Produto/ativar", new StringContent(produtoAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task CriarProduto()
+    {
+        try
+        {
+            HasError = false;
+            var produtoAsJson = JsonSerializer.Serialize(Produto);
+            var response = await Http.PostAsync("Produto", new StringContent(produtoAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            modalIsOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task EditarProduto()
+    {
+        try
+        {
+            HasError = false;
+            var produtoAsJson = JsonSerializer.Serialize(Produto);
+            var response = await Http.PutAsync("Produto", new StringContent(produtoAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            modalIsOpen = false;
+            StateHasChanged();
+        }
+    }
+}
