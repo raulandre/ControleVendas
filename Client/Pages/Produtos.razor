@@ -17,7 +17,7 @@
 <PageTitle>Produtos</PageTitle>
 <AuthorizeView>
     <Authorized>
-        <button type="submit" class="btn btn-primary mb-2" @onclick="AbrirModalCriacao">Novo produto</button>
+        <button type="submit" class="btn btn-primary mb-2 mt-2" @onclick="AbrirModalCriacao">Novo produto</button>
         <MatTable Context="ctx" Items="@produtos" Class="mat-elevation-z5">
             <MatTableHeader>
                 <th>Id</th>
@@ -48,9 +48,9 @@
 </AuthorizeView>
 
 <MatDialog @bind-IsOpen="modalIsOpen">
-    <EditForm Model="Produto" OnValidSubmit="@(edicao ? EditarProduto : CriarProduto)">
-        <MatDialogTitle>@(edicao ? "Editar" : "Criar") produto</MatDialogTitle>
-        <MatDialogContent>
+    <MatDialogTitle>@(edicao ? "Editar" : "Criar") produto</MatDialogTitle>
+    <MatDialogContent>
+        <EditForm id="editForm" Model="Produto" OnValidSubmit="@(edicao ? EditarProduto : CriarProduto)">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -62,19 +62,19 @@
             <div class="form-group">
                 <label for="preco">Preço</label>
                 <InputNumber Id="preco" class="form-control" @bind-Value="Produto.Preco" />
-                <ValidationMessage For="@(() => Produto.Descricao)" />
+                <ValidationMessage For="@(() => Produto.Preco)" />
             </div>
             <div class="form-group">
                 <label for="quantidade">Quantidade</label>
                 <InputNumber Id="quantidade" class="form-control" @bind-Value="Produto.Quantidade" />
                 <ValidationMessage For="@(() => Produto.Quantidade)" />
             </div>
-        </MatDialogContent>
-        <MatDialogActions>
-            <MatButton OnClick="() => modalIsOpen = false">Cancelar</MatButton>
-            <MatButton type="submit">Salvar</MatButton>
-        </MatDialogActions>
-    </EditForm>
+        </EditForm>
+    </MatDialogContent>
+    <MatDialogActions>
+        <MatButton OnClick="() => modalIsOpen = false">Cancelar</MatButton>
+        <MatButton type="submit" form="editForm">Salvar</MatButton>
+    </MatDialogActions>
 </MatDialog>
 
 @code {

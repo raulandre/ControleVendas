@@ -14,6 +14,8 @@ builder.Services.AddScoped<DbSession>();
 builder.Services.AddTransient<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<ProdutoRepository>();
+builder.Services.AddScoped<ClienteRepository>();
+builder.Services.AddScoped<VendaRepository>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

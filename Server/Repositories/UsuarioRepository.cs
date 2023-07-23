@@ -17,7 +17,7 @@ namespace ControleVendas.Server.Repositories
         public Task<Usuario> GetByNome(string nome)
         {
             return _session.Connection.QueryFirstOrDefaultAsync<Usuario>(@"
-                SELECT * FROM Usuarios WHERE Nome = @Nome
+                SELECT * FROM dbo.Usuarios_Raul WHERE Nome = @Nome
             ", new { Nome = nome });
         }
 
@@ -30,7 +30,7 @@ namespace ControleVendas.Server.Repositories
             dp.Add("Salt", usuario.Salt, DbType.Binary);
 
             return _session.Connection.ExecuteAsync(@"
-                INSERT INTO dbo.Usuarios (Nome, Hash, Salt) VALUES 
+                INSERT INTO dbo.Usuarios_Raul (Nome, Hash, Salt) VALUES 
                 (@Nome, @Hash, @Salt);
             ", dp);
         }

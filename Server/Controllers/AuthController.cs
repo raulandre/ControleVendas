@@ -74,5 +74,19 @@ namespace ControleVendas.Server.Controllers
                     Message = "Usuário cadastrado com sucesso!"
                 });
         }
+
+        [HttpGet("id")]
+        public IActionResult GetUsuarioLogado()
+        {
+            var id = User.Claims.FirstOrDefault(c => c.Type == "Id");
+
+            if (id is null)
+                return Unauthorized();
+
+            return Ok(new Usuario
+            {
+                Id = int.Parse(id.Value)
+            });
+        }
     }
 }

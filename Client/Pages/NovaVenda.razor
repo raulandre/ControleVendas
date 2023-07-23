@@ -1,0 +1,243 @@
+﻿@page "/novavenda"
+@using Blazored.LocalStorage;
+@using ControleVendas.Shared
+@using ControleVendas.Shared.Enums;
+@using ControleVendas.Shared.Models
+@using MatBlazor
+@using System.Text.Json;
+@using System.Text;
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService LocalStorageService
+
+@if (HasError)
+{
+    <div class="alert alert-danger mt-2 mb-2" role="alert">
+        @ErrorMessage
+    </div>
+} else if (HasSuccess)
+{
+    <div class="alert alert-success mt-2 mb-2" role="alert">
+        @SuccessMessage
+    </div>
+}
+
+<PageTitle>Nova venda</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <div class="card mt-2">
+            <div class="card-body">
+                <div class="card-title mat-h5">Nova venda</div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <MatAutocompleteList Items="@clientes" Context="ctx" Icon="group" TItem="Cliente" Label="Selecione um cliente" CustomStringSelector="@(i => i.Nome)" @bind-Value="@clienteSelecionado">
+                            <ItemTemplate>
+                                <div style="display: flex; flex-direction: row; width: 100%;">
+                                    <div style="flex: 1;">@ctx.Id</div>
+                                    <div style="width: 150px;">@ctx.Nome</div>
+                                </div>
+                            </ItemTemplate>
+                        </MatAutocompleteList>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <MatAutocompleteList @ref="listaProdutos" Items="@produtos" Context="ctx2" Icon="work" TItem="Produto" Label="Adicione um produto" ShowClearButton="true" CustomStringSelector="@(i => i.Descricao)" ValueChanged="AdicionarProduto">
+                                <ItemTemplate>
+                                    <div style="display: flex; flex-direction: row; width: 100%;">
+                                        <div style="flex: 1;">@ctx2?.Descricao</div>
+                                        <div style="width: 150px;">@ctx2?.Preco</div>
+                                    </div>
+                                </ItemTemplate>
+                            </MatAutocompleteList>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <MatTable Context="ctx3" Items="@vendaItens" Class="mat-elevation-z5">
+                                <MatTableHeader>
+                                    <th>Descrição</th>
+                                    <th>Preço</th>
+                                    <th>Quantidade</th>
+                                    <th>Desconto</th>
+                                    <th>Ações</th>
+                                </MatTableHeader>
+                                <MatTableRow>
+                                    <td>@ctx3.Key.Descricao</td>
+                                    <td>@ctx3.Key.Preco</td>
+                                    <td><InputNumber class="form-control" @bind-Value="ctx3.Value.Quantidade"></InputNumber></td>
+                                    <td><InputNumber class="form-control" @bind-Value="ctx3.Value.Desconto"></InputNumber></td>
+                                    <td>
+                                        <button class=@($"btn btn-danger mb-2")
+                                        @onclick="() => RemoverProduto(ctx3.Key)">
+                                            Remover
+                                        </button>
+                                    </td>
+                                </MatTableRow>
+                            </MatTable>
+                        </div>
+                    </div>
+                    @{
+                        var total = (double)@vendaItens.Select(i => i.Key.Preco * i.Value.Quantidade).Sum();
+                        var descontos = @vendaItens.Select(i => (double)(i.Key.Preco * i.Value.Quantidade) * (i.Value.Desconto / 100)).Sum();
+
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="mat-subtitle1">Total: @string.Format("{0:C}", total)</div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="mat-subtitle1">Descontos: @string.Format("{0:C}", descontos)</div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="mat-subtitle1">
+                                    Subtotal:
+                                    @(string.Format("{0:C}", total - descontos))
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <button class="btn btn-success mb-2 mt-2" @onclick="SalvarVenda">Salvar venda</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        Sem permissão.
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+    public bool HasError { get; set; }
+    public string ErrorMessage { get; set; }
+
+    public bool HasSuccess { get; set; }
+    public string SuccessMessage { get; set; }
+
+    public MatAutocompleteList<Produto> listaProdutos;
+
+    public List<Cliente> clientes = new();
+    public Cliente clienteSelecionado { get; set; }
+
+    public List<Produto> produtos = new();
+    public Dictionary<Produto, VendaItem> vendaItens { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarGrid();
+    }
+
+    public async Task CarregarGrid()
+    {
+        try
+        {
+            HasError = false;
+            HasSuccess = false;
+            var response = await Http.GetAsync("Cliente");
+
+            if (response.IsSuccessStatusCode)
+            {
+                clientes = JsonSerializer.Deserialize<List<Cliente>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+
+            response = await Http.GetAsync("Produto");
+            if (response.IsSuccessStatusCode)
+            {
+                produtos = JsonSerializer.Deserialize<List<Produto>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    public void AdicionarProduto(Produto produto)
+    {
+        vendaItens.Add(produto, new VendaItem { ProdutoId = produto.Id });
+        produtos = produtos.Where(p => p.Id != produto.Id).ToList();
+        StateHasChanged();
+    }
+
+    public void RemoverProduto(Produto produto)
+    {
+        produtos.Add(produto);
+        vendaItens.Remove(produto);
+        StateHasChanged();
+    }
+
+    public async Task SalvarVenda()
+    {
+        try
+        {
+            HasError = false;
+            HasSuccess = false;
+
+            if (clienteSelecionado is null)
+                throw new Exception("Selecione um cliente");
+
+            if (!vendaItens.Any())
+                throw new Exception("Selecione ao menos um produto para a venda");
+
+            var usuarioId = await ObterIdUsuarioLogado();
+
+            if (usuarioId == default)
+                throw new Exception("Falha ao recuperar id do vendedor");
+
+            var venda = new Venda
+            {
+                VendedorId = usuarioId,
+                ClienteId = clienteSelecionado.Id,
+                Itens = vendaItens.Values.ToList()
+            };
+
+            var vendaAsJson = JsonSerializer.Serialize(venda);
+            var response = await Http.PostAsync("Venda", new StringContent(vendaAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                HasSuccess = true;
+                SuccessMessage = "Venda efetuada com sucesso";
+            }
+            else
+            {
+                var erros = JsonSerializer.Deserialize<List<string>>(await response.Content.ReadAsStringAsync());
+                ErrorMessage = $"Produtos sem estoque suficiente: {string.Join(", ", erros)}";
+                HasError = true;
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task<int> ObterIdUsuarioLogado()
+    {
+        var response = await Http.GetAsync("Auth/id");
+
+        if (response.IsSuccessStatusCode)
+        {
+            return (JsonSerializer.Deserialize<Usuario>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })).Id;
+        }
+
+        return 0;
+    }
+}

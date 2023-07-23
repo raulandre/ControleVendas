@@ -1,0 +1,264 @@
+﻿@page "/clientes"
+@using ControleVendas.Shared
+@using ControleVendas.Shared.Enums;
+@using ControleVendas.Shared.Models
+@using MatBlazor
+@using System.Text.Json;
+@using System.Text;
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+@if (HasError)
+{
+    <div class="alert alert-danger mt-2 mb-2" role="alert">
+        @ErrorMessage
+    </div>
+}
+
+<PageTitle>Clientes</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <button type="submit" class="btn btn-primary mb-2 mt-2" @onclick="AbrirModalCriacao">Novo cliente</button>
+        <MatTable Context="ctx" Items="@clientes" Class="mat-elevation-z5">
+            <MatTableHeader>
+                <th>Id</th>
+                <th>Nome</th>
+                <th>Nascimento</th>
+                <th>Tipo Pessoa</th>
+                <th>Documento</th>
+                <th>Endereco</th>
+                <th>Ações</th>
+            </MatTableHeader>
+            <MatTableRow>
+                <td>@ctx.Id</td>
+                <td>@ctx.Nome</td>
+                <td>@ctx.Nascimento.ToShortDateString()</td>
+                <td>@(ctx.TipoPessoa == TipoPessoa.Juridica ? "Jurídica" : "Física")</td>
+                <td>@(ctx.TipoPessoa == TipoPessoa.Juridica ? ctx.CNPJ : ctx.CPF)</td>
+                <td>@ctx.Endereco</td>
+                <td>
+                    <button class=@($"btn {(ctx.Ativo ? "btn-danger" : "btn-success")} mb-2")
+                    @onclick="@(ctx.Ativo ? async () => await Inativar(ctx) : async () => await Ativar(ctx))">
+                        @(ctx.Ativo ? "Inativar" : "Ativar")
+                    </button>
+
+                    <button class="btn btn-primary mb-2" @onclick="() => AbrirModalEdicao((Cliente)ctx.Clone())">Editar</button>
+                </td>
+            </MatTableRow>
+        </MatTable>
+    </Authorized>
+    <NotAuthorized>
+        Sem permissão.
+    </NotAuthorized>
+</AuthorizeView>
+
+<MatDialog @bind-IsOpen="modalIsOpen">
+    <EditForm Model="Cliente" OnValidSubmit="@(edicao ? EditarCliente : CriarCliente)">
+        <MatDialogTitle>@(edicao ? "Editar" : "Criar") cliente</MatDialogTitle>
+        <MatDialogContent>
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group">
+                <label for="nome">Nome</label>
+                <InputText Id="nome" class="form-control" @bind-Value="Cliente.Nome" />
+                <ValidationMessage For="@(() => Cliente.Nome)" />
+            </div>
+            <div class="form-group">
+                <label for="nascimento">Nascimento</label>
+                <InputDate Id="nascimento" class="form-control" @bind-Value="Cliente.Nascimento" />
+                <ValidationMessage For="@(() => Cliente.Nascimento)" />
+            </div>
+            <div class="form-group">
+                <label for="tipo-pessoa">Tipo Pessoa</label>
+                <MatRadioGroup @bind-Value="Cliente.TipoPessoa" TValue="TipoPessoa">
+                    <MatRadioButton Value="TipoPessoa.Fisica" TValue="TipoPessoa">Física</MatRadioButton>
+                    <MatRadioButton Value="TipoPessoa.Juridica" TValue="TipoPessoa">Jurídica</MatRadioButton>
+                </MatRadioGroup>
+            </div>
+            @if (Cliente.TipoPessoa == TipoPessoa.Juridica)
+            {
+                <div class="form-group">
+                    <label for="cnpj">CNPJ</label>
+                    <InputText Id="cnpj" class="form-control" @bind-Value="Cliente.CNPJ" />
+                    <ValidationMessage For="@(() => Cliente.CNPJ)" />
+                </div>
+            }
+            else
+            {
+                <div class="form-group">
+                    <label for="cpf">CPF</label>
+                    <InputText Id="cpf" class="form-control" @bind-Value="Cliente.CPF" />
+                    <ValidationMessage For="@(() => Cliente.CPF)" />
+                </div>
+            }
+            <div class="form-group">
+                <label for="endereco">Endereço</label>
+                <InputText Id="endereco" class="form-control" @bind-Value="Cliente.Endereco" />
+                <ValidationMessage For="@(() => Cliente.Endereco)" />
+            </div>
+        </MatDialogContent>
+        <MatDialogActions>
+            <MatButton OnClick="() => modalIsOpen = false">Cancelar</MatButton>
+            <MatButton type="submit">Salvar</MatButton>
+        </MatDialogActions>
+    </EditForm>
+</MatDialog>
+
+@code {
+    public List<Cliente> clientes = new();
+
+    public bool HasError { get; set; }
+    public string ErrorMessage { get; set; }
+
+    public Cliente Cliente { get; set; } = new();
+    private bool edicao = false;
+    private bool modalIsOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarGrid();
+    }
+
+    public async Task CarregarGrid()
+    {
+        try
+        {
+            HasError = false;
+            var response = await Http.GetAsync("Cliente");
+
+            if (response.IsSuccessStatusCode)
+            {
+                clientes = JsonSerializer.Deserialize<List<Cliente>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    public void AbrirModalCriacao()
+    {
+        Cliente = new();
+        edicao = false;
+        modalIsOpen = true;
+        StateHasChanged();
+    }
+
+    public void AbrirModalEdicao(Cliente cliente)
+    {
+        Cliente = cliente;
+        edicao = true;
+        modalIsOpen = true;
+        StateHasChanged();
+    }
+
+    public async Task Inativar(Cliente cliente)
+    {
+        try
+        {
+            HasError = false;
+            var clienteAsJson = JsonSerializer.Serialize(cliente);
+            var response = await Http.PostAsync("Cliente/inativar", new StringContent(clienteAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    public async Task Ativar(Cliente cliente)
+    {
+        try
+        {
+            HasError = false;
+            var clienteAsJson = JsonSerializer.Serialize(cliente);
+            var response = await Http.PostAsync("Cliente/ativar", new StringContent(clienteAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task CriarCliente()
+    {
+        try
+        {
+            HasError = false;
+            var clienteAsJson = JsonSerializer.Serialize(Cliente);
+            var response = await Http.PostAsync("Cliente", new StringContent(clienteAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+            else
+            {
+                HasError = true;
+                ErrorMessage = "Erro ao criar cliente";
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            modalIsOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task EditarCliente()
+    {
+        try
+        {
+            HasError = false;
+            var clienteAsJson = JsonSerializer.Serialize(Cliente);
+            var response = await Http.PutAsync("Cliente", new StringContent(clienteAsJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                await CarregarGrid();
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            modalIsOpen = false;
+            StateHasChanged();
+        }
+    }
+}

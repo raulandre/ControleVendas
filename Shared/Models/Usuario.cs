@@ -1,4 +1,6 @@
-﻿namespace ControleVendas.Shared.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ControleVendas.Shared.Models
 {
     public class Usuario : ModelBase
     {
