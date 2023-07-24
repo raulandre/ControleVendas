@@ -13,7 +13,7 @@ namespace ControleVendas.Shared.Models
         public decimal Preco { get; set; }
 
         [Required(ErrorMessage = "Quantidade é obrigatória")]
-        [Range(1, int.MaxValue, ErrorMessage = "Quantidade precisa ser maior que zero")]
+        [Range(0, int.MaxValue, ErrorMessage = "Quantidade precisa ser maior ou igual a zero")]
         public int Quantidade { get; set; }
 
         public object Clone()

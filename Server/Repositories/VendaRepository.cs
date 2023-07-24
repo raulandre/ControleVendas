@@ -16,8 +16,24 @@ namespace ControleVendas.Server.Repositories
         public async Task<IEnumerable<Venda>> GetAll()
         {
             var query = @"
-                SELECT V.*, ' ' as split, VI.* FROM dbo.Vendas_Raul V
-                LEFT JOIN dbo.VendaItens_Raul VI ON VI.VendaId = V.Id
+                SELECT V.Id, V.VendedorId, V.ClienteId, U.Nome AS Vendedor, C.Nome AS Cliente,
+                SUM(VI.ValorUnitario * VI.Quantidade) AS Total,
+                SUM(VI.ValorUnitario * VI.Quantidade) * (VI.Desconto / 100) AS Desconto,
+                ' ' as split, 
+                VI.ProdutoId, VI.Quantidade, VI.Desconto
+                FROM dbo.Vendas_Raul V
+                INNER JOIN dbo.VendaItens_Raul VI ON VI.VendaId = V.Id
+                INNER JOIN dbo.Usuarios_Raul U ON U.Id = V.VendedorId
+                INNER JOIN dbo.Clientes_Raul C ON C.Id = V.ClienteId
+                GROUP BY V.Id, 
+                V.VendedorId, 
+                V.ClienteId, 
+                U.Nome, 
+                C.Nome,
+                Desconto,
+                VI.ProdutoId,
+                VI.Quantidade,
+                VI.Desconto
             ";
 
             var lookup = new Dictionary<int, Venda>();
@@ -57,8 +73,8 @@ namespace ControleVendas.Server.Repositories
             if (vendaId != default)
             {
                 query = @"
-                    INSERT INTO dbo.VendaItens_Raul (VendaId, ProdutoId, Quantidade, Desconto)
-                    VALUES (@VendaId, @ProdutoId, @Quantidade, @Desconto)
+                    INSERT INTO dbo.VendaItens_Raul (VendaId, ProdutoId, Quantidade, Desconto, ValorUnitario)
+                    VALUES (@VendaId, @ProdutoId, @Quantidade, @Desconto, @ValorUnitario)
                 ";
 
                 await _session.Connection.ExecuteAsync(query, v.Itens);

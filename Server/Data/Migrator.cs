@@ -62,6 +62,7 @@ namespace ControleVendas.Server.Data
                     VendaId INT NOT NULL,
                     ProdutoId INT NOT NULL,
                     Quantidade INT NOT NULL,
+                    ValorUnitario DECIMAL(10, 2) NOT NULL,
                     Desconto DECIMAL(10, 2) NOT NULL,
 
                     CONSTRAINT FK_VendaItemVenda_Raul FOREIGN KEY (VendaId) REFERENCES Vendas_Raul(Id),

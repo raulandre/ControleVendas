@@ -1,0 +1,80 @@
+﻿@page "/relatorio"
+@using ControleVendas.Shared
+@using ControleVendas.Shared.Models
+@using MatBlazor
+@using System.Text.Json;
+@using System.Text;
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+@if (HasError)
+{
+    <div class="alert alert-danger" role="alert">
+        @ErrorMessage
+    </div>
+}
+
+<PageTitle>Relatório de Vendas</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <MatTable Context="ctx" Items="@vendas" Class="mat-elevation-z5">
+            <MatTableHeader>
+                <th>Id</th>
+                <th>Vendedor</th>
+                <th>Cliente</th>
+                <th>Valor</th>
+                <th>Desconto</th>
+                <th>Total</th>
+            </MatTableHeader>
+            <MatTableRow>
+                @{
+                    
+                    <td>@ctx.Id</td>
+                    <td>@ctx.Vendedor</td>
+                    <td>@ctx.Cliente</td>
+                    <td>@string.Format("{0:C}", ctx.Total)</td>
+                    <td>@string.Format("{0:C}", ctx.Desconto)</td>
+                    <td>@string.Format("{0:C}", ctx.Total - ctx.Desconto)</td>
+                }
+            </MatTableRow>
+        </MatTable>
+    </Authorized>
+    <NotAuthorized>
+        Sem permissão.
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    public List<Venda> vendas = new();
+
+    public bool HasError { get; set; }
+    public string ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarGrid();
+    }
+
+    public async Task CarregarGrid()
+    {
+        try
+        {
+            HasError = false;
+            var response = await Http.GetAsync("Venda");
+
+            if (response.IsSuccessStatusCode)
+            {
+                vendas = JsonSerializer.Deserialize<List<Venda>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+        catch (Exception e)
+        {
+            HasError = true;
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+}

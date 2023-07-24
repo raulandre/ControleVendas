@@ -25,12 +25,19 @@ namespace ControleVendas.Server.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var vendas = await _vendaRepository.GetAll();
+            try
+            {
+                var vendas = await _vendaRepository.GetAll();
 
-            if (vendas.Any())
-                return Ok(vendas);
+                if (vendas.Any())
+                    return Ok(vendas);
 
-            return NotFound();
+                return NotFound();
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
         }
 
         [HttpPost]

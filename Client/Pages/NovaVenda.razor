@@ -166,7 +166,7 @@
 
     public void AdicionarProduto(Produto produto)
     {
-        vendaItens.Add(produto, new VendaItem { ProdutoId = produto.Id });
+        vendaItens.Add(produto, new VendaItem { ProdutoId = produto.Id, ValorUnitario = (double)produto.Preco });
         produtos = produtos.Where(p => p.Id != produto.Id).ToList();
         StateHasChanged();
     }
