@@ -13,32 +13,26 @@ namespace ControleVendas.Server.Repositories
             _session = session;
         }
 
-        public async Task<IEnumerable<Venda>> GetAll()
+        public async Task<IEnumerable<Venda>> GetAll(int vendedorId, DateTime dataInicio, DateTime dataFim)
         {
             var query = @"
-                SELECT V.Id, V.VendedorId, V.ClienteId, U.Nome AS Vendedor, C.Nome AS Cliente,
-                SUM(VI.ValorUnitario * VI.Quantidade) AS Total,
-                SUM(VI.ValorUnitario * VI.Quantidade) * (VI.Desconto / 100) AS Desconto,
+                 SELECT V.Id, V.VendedorId, V.ClienteId, U.Nome AS Vendedor, C.Nome AS Cliente,
                 ' ' as split, 
-                VI.ProdutoId, VI.Quantidade, VI.Desconto
+                VI.*,
+                ' ' as split, 
+                P.*
                 FROM dbo.Vendas_Raul V
                 INNER JOIN dbo.VendaItens_Raul VI ON VI.VendaId = V.Id
                 INNER JOIN dbo.Usuarios_Raul U ON U.Id = V.VendedorId
                 INNER JOIN dbo.Clientes_Raul C ON C.Id = V.ClienteId
-                GROUP BY V.Id, 
-                V.VendedorId, 
-                V.ClienteId, 
-                U.Nome, 
-                C.Nome,
-                Desconto,
-                VI.ProdutoId,
-                VI.Quantidade,
-                VI.Desconto
+                INNER JOIN dbo.Produtos_Raul P ON P.Id = VI.ProdutoId
+                WHERE V.VendedorId = @vendedorId AND V.Timestamp BETWEEN @dataInicio AND @dataFim
+                ORDER BY V.Timestamp DESC
             ";
 
             var lookup = new Dictionary<int, Venda>();
 
-            await _session.Connection.QueryAsync<Venda, VendaItem, Venda>(query, (venda, vendaItem) =>
+            await _session.Connection.QueryAsync<Venda, VendaItem, Produto, Venda>(query, (venda, vendaItem, produto) =>
             {
                 if (!lookup.TryGetValue(venda.Id, out var v))
                 {
@@ -47,11 +41,34 @@ namespace ControleVendas.Server.Repositories
                     lookup.Add(venda.Id, v);
                 }
 
+                vendaItem.Produto = produto;
                 v.Itens.Add(vendaItem);
                 return v;
-            }, splitOn: "split");
+            }, splitOn: "split", 
+            param: new
+            {
+                vendedorId,
+                dataInicio = dataInicio.Date,
+                dataFim = dataFim.Date
+            });
 
-            return lookup.Values;
+            var vendas = lookup.Values;
+
+            var vendasMapeadas = vendas.GroupBy(v => v.Id).Select(g => new Venda
+            {
+                Id = g.Key,
+                Vendedor = g.First().Vendedor,
+                Cliente = g.First().Cliente,
+                Itens = g.SelectMany(i => i.Itens).ToList(),
+            }).ToList();
+
+            vendasMapeadas.ForEach(v =>
+            {
+                v.Total = v.Itens.Sum(i => i.Quantidade * i.ValorUnitario);
+                v.Desconto = v.Itens.Sum(i => i.Quantidade * i.ValorUnitario * i.Desconto / 100f);
+            });
+
+            return vendasMapeadas;
         }
 
         public async Task<int> Save(Venda v)

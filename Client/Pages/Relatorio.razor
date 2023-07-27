@@ -4,6 +4,7 @@
 @using MatBlazor
 @using System.Text.Json;
 @using System.Text;
+@using System.Web;
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 
@@ -14,45 +15,134 @@
     </div>
 }
 
+
+<style>
+    .mdc-dialog .mdc-dialog__surface {
+        max-width: none !important;
+    }
+</style>
+
 <PageTitle>Relatório de Vendas</PageTitle>
 <AuthorizeView>
     <Authorized>
-        <MatTable Context="ctx" Items="@vendas" Class="mat-elevation-z5">
-            <MatTableHeader>
-                <th>Id</th>
-                <th>Vendedor</th>
-                <th>Cliente</th>
-                <th>Valor</th>
-                <th>Desconto</th>
-                <th>Total</th>
-            </MatTableHeader>
-            <MatTableRow>
-                @{
-                    
-                    <td>@ctx.Id</td>
-                    <td>@ctx.Vendedor</td>
-                    <td>@ctx.Cliente</td>
-                    <td>@string.Format("{0:C}", ctx.Total)</td>
-                    <td>@string.Format("{0:C}", ctx.Desconto)</td>
-                    <td>@string.Format("{0:C}", ctx.Total - ctx.Desconto)</td>
-                }
-            </MatTableRow>
-        </MatTable>
+        <div class="row">
+            <div class="col-md-2">
+                <MatAutocompleteList Items="@usuarios" Context="ctx" TItem="Usuario" Label="Selecione um vendedor" ShowClearButton="true" CustomStringSelector="@(i => i.Nome)" @bind-Value="@usuarioSelecionado">
+                    <ItemTemplate>
+                        <div style="display: flex; flex-direction: row; width: 100%;">
+                            <div style="flex: 1;">@ctx.Nome</div>
+                            <div style="width: 150px;">@ctx.Id</div>
+                        </div>
+                    </ItemTemplate>
+                </MatAutocompleteList>
+            </div>
+            <div class="col-md-2">
+                <MatDatePicker Label="Data Início" @bind-Value="@dataInicio"></MatDatePicker>
+            </div>
+            <div class="col-md-2">
+                <MatDatePicker Label="Data Fim" @bind-Value="@dataFim"></MatDatePicker>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary mb-2 mt-2" @onclick="CarregarGrid">Buscar</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <MatTable Context="ctx" Items="@vendas" AllowSelection="true" SelectionChanged="VisualizarDetalhes" Class="mat-elevation-z5">
+                    <MatTableHeader>
+                        <th>Id</th>
+                        <th>Vendedor</th>
+                        <th>Cliente</th>
+                        <th>Valor</th>
+                        <th>Desconto</th>
+                        <th>Total</th>
+                    </MatTableHeader>
+                    <MatTableRow>
+                        <td>@ctx.Id</td>
+                        <td>@ctx.Vendedor</td>
+                        <td>@ctx.Cliente</td>
+                        <td>@string.Format("{0:C}", ctx.Total)</td>
+                        <td>@string.Format("{0:C}", ctx.Desconto)</td>
+                        <td>@string.Format("{0:C}", ctx.Total - ctx.Desconto)</td>
+                    </MatTableRow>
+                </MatTable>
+            </div>
+        </div>
     </Authorized>
     <NotAuthorized>
         Sem permissão.
     </NotAuthorized>
 </AuthorizeView>
 
+@if (vendas.Any())
+{
+    <MatDialog @bind-IsOpen="modalIsOpen">
+        <MatDialogTitle>
+            Venda #@(
+         vendaSelecionada.Id
+         )
+        </MatDialogTitle>
+        <MatDialogContent>
+            <MatTable Context="ctx" Items="@vendaSelecionada.Itens" Class="mat-elevation-z5">
+                <MatTableHeader>
+                    <th>Descrição</th>
+                    <th>Quantidade</th>
+                    <th>Preço Unitário</th>
+                    <th>Desconto</th>
+                    <th>Total</th>
+                </MatTableHeader>
+                <MatTableRow>
+                    @{
+                        var total = ctx.ValorUnitario * ctx.Quantidade;
+                        var descontos = total * (ctx.Desconto / 100);
+
+                        <td>@ctx.Produto.Descricao</td>
+                        <td>@ctx.Quantidade</td>
+                        <td>@string.Format("{0:C}", ctx.ValorUnitario)</td>
+                        <td>@string.Format("{0:C}",descontos)</td>
+                        <td>@string.Format("{0:C}",total - descontos)</td>
+                    }
+                </MatTableRow>
+            </MatTable>
+        </MatDialogContent>
+        <MatDialogActions>
+            <MatButton OnClick="() => modalIsOpen = false">Fechar</MatButton>
+        </MatDialogActions>
+    </MatDialog>
+}
+
 @code {
     public List<Venda> vendas = new();
+    public List<Usuario> usuarios { get; set; }
+    public Usuario usuarioSelecionado { get; set; }
+    public DateTime dataInicio { get; set; }
+    public DateTime dataFim { get; set; }
+    public bool modalIsOpen { get; set; }
+    public Venda vendaSelecionada { get; set; }
 
     public bool HasError { get; set; }
     public string ErrorMessage { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        await CarregarGrid();
+        await CarregarUsuarios();
+    }
+
+    public async Task CarregarUsuarios()
+    {
+        HasError = false;
+        var response = await Http.GetAsync("Usuario");
+
+        if (response.IsSuccessStatusCode)
+        {
+            usuarios = JsonSerializer.Deserialize<List<Usuario>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            StateHasChanged();
+        }
+        else
+        {
+            HasError = true;
+            ErrorMessage = "Falha ao carregar vendedores";
+        }
     }
 
     public async Task CarregarGrid()
@@ -60,11 +150,30 @@
         try
         {
             HasError = false;
-            var response = await Http.GetAsync("Venda");
+
+            if (usuarioSelecionado is null)
+                throw new Exception("Selecione um vendedor");
+
+            if (dataInicio.Date < dataFim.Date)
+                throw new Exception("Data inicio deve ser maior que data fim");
+
+            var query = HttpUtility.ParseQueryString(string.Empty);
+            query["vendedorId"] = usuarioSelecionado.Id.ToString();
+            query["dataInicio"] = dataInicio.ToString("yyyy-MM-ddTHH:mm:ss");
+            query["dataFim"] = dataFim.ToString("yyyy-MM-ddTHH:mm:ss");
+
+            var uri = $"Venda/?{query.ToString()}";
+
+            var response = await Http.GetAsync(uri);
 
             if (response.IsSuccessStatusCode)
             {
                 vendas = JsonSerializer.Deserialize<List<Venda>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            else
+            {
+                HasError = true;
+                ErrorMessage = await response.Content.ReadAsStringAsync();
             }
         }
         catch (Exception e)
@@ -76,5 +185,12 @@
         {
             StateHasChanged();
         }
+    }
+
+    public void VisualizarDetalhes(object v)
+    {
+        vendaSelecionada = (Venda)v;
+        modalIsOpen = true;
+        StateHasChanged();
     }
 }

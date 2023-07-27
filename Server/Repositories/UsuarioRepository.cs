@@ -14,6 +14,13 @@ namespace ControleVendas.Server.Repositories
             _session = session;
         }
 
+        public Task<IEnumerable<Usuario>> GetAllAtivos()
+        {
+            return _session.Connection.QueryAsync<Usuario>(@"
+                SELECT * FROM dbo.Usuarios_Raul WHERE Ativo = 1 ORDER BY Id DESC
+            ");
+        }
+
         public Task<Usuario> GetByNome(string nome)
         {
             return _session.Connection.QueryFirstOrDefaultAsync<Usuario>(@"

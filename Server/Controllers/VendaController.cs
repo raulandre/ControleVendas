@@ -23,21 +23,18 @@ namespace ControleVendas.Server.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int vendedorId, 
+            [FromQuery] DateTime dataInicio, 
+            [FromQuery] DateTime dataFim
+        )
         {
-            try
-            {
-                var vendas = await _vendaRepository.GetAll();
+            var vendas = await _vendaRepository.GetAll(vendedorId, dataInicio, dataFim);
 
-                if (vendas.Any())
-                    return Ok(vendas);
+            if (vendas.Any())
+                return Ok(vendas);
 
-                return NotFound();
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
+            return NotFound();
         }
 
         [HttpPost]
@@ -45,10 +42,10 @@ namespace ControleVendas.Server.Controllers
         {
             var produtosSemEstoque = await _produtoRepository.VerificaEstoque(venda.Itens);
 
-            if(produtosSemEstoque.Any())
+            if (produtosSemEstoque.Any())
             {
                 return BadRequest(produtosSemEstoque.Select(p => p.Descricao));
-            } 
+            }
 
             var vendaId = await _vendaRepository.Save(venda);
             await _produtoRepository.UpdateEstoque(vendaId);
